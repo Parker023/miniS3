@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: minis3-storage-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/minis3
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    show-sql: true
+    hibernate:
+      .ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+server:
+  port: 2399
+  servlet:
+    context-path: /storage/minis3
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:3600000}
+
+minis3:
+  upload:
+    max-size: 5MB
+  app:
+    storage:
+      location: ./storage
