@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -217,6 +218,86 @@ class ObjectControllerIntegrationTest {
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                         .content("a=b"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void presignedGetWorksWithoutAuthorization() throws Exception {
+        putText("my docs/report 1.txt", "hello world");
+        String url = presign(token, "my docs/report 1.txt", "GET", null);
+
+        mockMvc.perform(get(URI.create(url)))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.ETAG, HELLO_ETAG))
+                .andExpect(content().string("hello world"));
+        mockMvc.perform(get(URI.create(url)).header(HttpHeaders.RANGE, "bytes=6-10"))
+                .andExpect(status().isPartialContent())
+                .andExpect(content().string("world"));
+
+        // a GET link can't be used to upload, and edits to the link break the signature
+        mockMvc.perform(put(URI.create(url)).content("overwrite".getBytes(StandardCharsets.UTF_8)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(URI.create(url.replace("report%201.txt", "other.txt"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(URI.create(url.replaceFirst("expires=(\\d+)", "expires=9999999999"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void presignedPutUploadsWithoutAuthorization() throws Exception {
+        String url = presign(token, "uploads/photo.bin", "PUT", 60L);
+
+        mockMvc.perform(put(URI.create(url))
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                        .content("binary-data".getBytes(StandardCharsets.UTF_8)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.key").value("uploads/photo.bin"));
+
+        mockMvc.perform(withAuth(get(objectUrl("uploads/photo.bin")), token))
+                .andExpect(status().isOk())
+                .andExpect(content().string("binary-data"));
+    }
+
+    @Test
+    void presignedUrlFromRevokedKeyStopsWorking() throws Exception {
+        putText("doc.txt", "hello world");
+        String response = mockMvc.perform(withAuth(post("/api/v1/keys"), token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"linker\",\"scopes\":[\"READ\"]}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String apiKey = JsonPath.read(response, "$.apiKey");
+        String keyId = JsonPath.read(response, "$.keyId");
+
+        String url = presign(apiKey, "doc.txt", "GET", null);
+        mockMvc.perform(get(URI.create(url))).andExpect(status().isOk());
+
+        mockMvc.perform(withAuth(delete("/api/v1/keys/{id}", keyId), token)).andExpect(status().isOk());
+        mockMvc.perform(get(URI.create(url))).andExpect(status().isForbidden());
+
+        // a read-only key can't hand out upload links
+        mockMvc.perform(withAuth(post("/api/v2/buckets/{bucket}/presign", bucketName), createKey("{\"name\":\"readonly\",\"scopes\":[\"READ\"]}"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"key\":\"x.txt\",\"method\":\"PUT\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void presignRejectsBadExpiry() throws Exception {
+        mockMvc.perform(withAuth(post("/api/v2/buckets/{bucket}/presign", bucketName), token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"key\":\"x.txt\",\"method\":\"GET\",\"expiresInSeconds\":999999999}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    private String presign(String authToken, String key, String method, Long expiresInSeconds) throws Exception {
+        String body = "{\"key\":\"" + key + "\",\"method\":\"" + method + "\""
+                + (expiresInSeconds == null ? "" : ",\"expiresInSeconds\":" + expiresInSeconds) + "}";
+        String response = mockMvc.perform(withAuth(post("/api/v2/buckets/{bucket}/presign", bucketName), authToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(response, "$.url");
     }
 
     private String objectUrl(String key) {

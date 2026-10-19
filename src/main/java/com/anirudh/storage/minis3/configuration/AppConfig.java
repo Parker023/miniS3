@@ -7,12 +7,19 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Clock;
+
 /**
  * @author Anirudh
  * @since 20/02/26
  */
 @Configuration
 public class AppConfig {
+
+    @Bean
+    public Clock clock() {
+        return Clock.systemUTC();
+    }
 
     @Bean
     public PasswordEncoder encoder() {

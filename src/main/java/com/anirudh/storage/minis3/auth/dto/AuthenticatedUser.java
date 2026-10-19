@@ -31,23 +31,26 @@ public class AuthenticatedUser {
     // empty means every bucket the user owns
     private final Set<UUID> allowedBucketIds;
     private final boolean apiKey;
+    // keyPublicId of the API key used, null for JWT callers
+    private final UUID apiKeyId;
 
     /**
      * A user logged in with a JWT: every scope, every bucket they own.
      */
     public AuthenticatedUser(UUID userPublicId) {
-        this(userPublicId, EnumSet.allOf(ApiKeyScope.class), Set.of(), false);
+        this(userPublicId, EnumSet.allOf(ApiKeyScope.class), Set.of(), null);
     }
 
-    private AuthenticatedUser(UUID userPublicId, Set<ApiKeyScope> scopes, Set<UUID> allowedBucketIds, boolean apiKey) {
+    private AuthenticatedUser(UUID userPublicId, Set<ApiKeyScope> scopes, Set<UUID> allowedBucketIds, UUID apiKeyId) {
         this.userPublicId = userPublicId;
         this.scopes = Set.copyOf(scopes);
         this.allowedBucketIds = Set.copyOf(allowedBucketIds);
-        this.apiKey = apiKey;
+        this.apiKey = apiKeyId != null;
+        this.apiKeyId = apiKeyId;
     }
 
-    public static AuthenticatedUser forApiKey(UUID ownerId, Set<ApiKeyScope> scopes, Set<UUID> allowedBucketIds) {
-        return new AuthenticatedUser(ownerId, scopes, allowedBucketIds, true);
+    public static AuthenticatedUser forApiKey(UUID apiKeyId, UUID ownerId, Set<ApiKeyScope> scopes, Set<UUID> allowedBucketIds) {
+        return new AuthenticatedUser(ownerId, scopes, allowedBucketIds, apiKeyId);
     }
 
     public boolean canAccessBucket(UUID bucketPublicId) {

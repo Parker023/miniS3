@@ -123,7 +123,7 @@ public class ApiKeyService {
                 .filter(ApiKey::isActive)
                 .map(apiKey -> {
                     apiKey.setLastUsedAt(LocalDateTime.now());
-                    return AuthenticatedUser.forApiKey(apiKey.getOwnerId(), apiKey.getScopes(), apiKey.getBucketIds());
+                    return AuthenticatedUser.forApiKey(apiKey.getKeyPublicId(), apiKey.getOwnerId(), apiKey.getScopes(), apiKey.getBucketIds());
                 });
     }
 

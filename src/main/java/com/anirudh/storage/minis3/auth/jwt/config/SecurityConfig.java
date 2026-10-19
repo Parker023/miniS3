@@ -32,6 +32,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/users/register", "/api/v1/auth/login")
                         .permitAll()
+                        // pre-signed URLs carry their own signature instead of an Authorization header
+                        .requestMatchers("/api/v2/presigned/**")
+                        .permitAll()
                         // key management needs a logged-in user, not an API key
                         .requestMatchers("/api/v1/keys/**")
                         .hasAuthority(AuthenticatedUser.ROLE_USER)

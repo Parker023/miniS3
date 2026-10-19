@@ -29,6 +29,9 @@ A small, monolithic object-storage service inspired by Amazon S3. Users register
 | `DB_PASSWORD`     | yes      | PostgreSQL password                                                 |
 | `JWT_SECRET`      | yes      | **Base64-encoded** HMAC key, at least 256 bits (32 bytes) once decoded |
 | `JWT_EXPIRATION`  | no       | Token lifetime in ms (default `3600000` = 1 hour)                   |
+| `MINIS3_PUBLIC_URL` | no     | Base URL put into pre-signed links, e.g. `https://laptop.tailnet.ts.net/storage/minis3`. If empty, it's built from the incoming request |
+
+`JWT_SECRET` also signs pre-signed URLs (a separate key is derived from it), so changing it invalidates every outstanding link. The app won't start without it.
 
 Generate a secret with:
 
@@ -54,7 +57,7 @@ http://localhost:2399/storage/minis3
 ./gradlew test
 ```
 
-Tests use H2 via `application-test.yaml`.
+Tests use H2 and a fixed test secret from [application-test.yaml](src/test/resources/application-test.yaml).
 
 ## Configuration
 
@@ -65,8 +68,9 @@ Key settings from [application.yaml](src/main/resources/application.yaml):
 | `server.port`                     | `2399`             |                                          |
 | `server.servlet.context-path`     | `/storage/minis3`  |                                          |
 | `spring.servlet.multipart.max-file-size` | `20MB`      | Hard limit enforced by Spring            |
-| `minis3.upload.max-size`          | `5MB`              | Application-level per-file upload limit  |
+| `minis3.upload.max-size`          | `20MB`             | Application-level per-file upload limit (v1 and v2) |
 | `minis3.app.storage.location`     | `./storage`        | Root directory for stored file bytes     |
+| `minis3.presign.base-url`         | `${MINIS3_PUBLIC_URL:}` | Base URL for pre-signed links       |
 
 Files are stored on disk as `<storage-root>/<bucketPublicId>/<filePublicId>`; the original filename and content type are kept in the database.
 
@@ -162,6 +166,37 @@ curl "$BASE/api/v2/buckets/photos/objects?prefix=2026/" -H "Authorization: Beare
 curl -X DELETE $BASE/api/v2/buckets/photos/objects/2026/cat.png -H "Authorization: Bearer $API_KEY"
 ```
 
+### Pre-signed URLs
+
+A pre-signed URL is a time-limited link for **one object and one method** (`GET` or `PUT`) that works **without an `Authorization` header**. A backend can give it to a browser or another client, so the file goes straight to or from miniS3 and never passes through that backend.
+
+**Issue** (JWT or API key):
+
+```
+POST /api/v2/buckets/{bucket}/presign
+{ "key": "2026/cat.png", "method": "GET", "expiresInSeconds": 600 }
+
+200 { "url": "https://.../api/v2/presigned/{bucketId}/2026/cat.png?expires=...&signature=...", "method": "GET", "expiresAt": "..." }
+```
+
+- A `GET` link needs the `READ` scope to issue, and a `PUT` link needs `WRITE`. The caller must also be allowed to use the bucket.
+- `expiresInSeconds` defaults to 15 minutes, with a maximum of 7 days.
+- The object doesn't have to exist yet for a `PUT` link.
+
+**Use** — plain HTTP, no credentials:
+
+| Method | Path | Behaves like |
+|--------|------|--------------|
+| GET    | `/api/v2/presigned/{bucketId}/{key...}?expires=&signature=[&credential=]` | v2 `GET` (ETag, 304, Range/206) |
+| PUT    | same | v2 `PUT` (raw body, size limit, `201`/`200`) |
+
+**Security**
+- The `signature` is an HMAC-SHA256 over the method, bucket, key, expiry and issuing key. Changing any of them, or using a `GET` link to `PUT`, gives a `403`.
+- Expired links get a `403`.
+- Links issued **with an API key** include that key's id as `credential`. They stop working as soon as the key is revoked or expires, or if it loses the scope or bucket access.
+- Links issued **with a JWT** can't be revoked individually; they're valid until they expire. Keep them short.
+- Anyone holding the link can use it until then, so treat it like a password.
+
 ### Example session
 
 ```bash
@@ -198,7 +233,7 @@ Errors are returned as `{ "message": "...", "timestamp": "..." }` by [GlobalExce
 |--------|------|
 | 400    | Malformed JSON, empty file, invalid object key or cursor, form-encoded object upload |
 | 401    | Missing/invalid/expired/revoked token or API key, wrong credentials |
-| 403    | Bucket you don't own, bucket outside a key's restriction, or missing scope |
+| 403    | Bucket you don't own, bucket outside a key's restriction, missing scope, or an invalid/expired/revoked pre-signed URL |
 | 404    | Bucket, file or object not found |
 | 409    | Duplicate email, bucket name or file name |
 | 413    | Upload larger than `minis3.upload.max-size` (or the multipart limit for v1) |
@@ -228,7 +263,7 @@ Every entity exposes a random **public UUID** (`userPublicId`, `bucketPublicId`,
 - [x] Ownership check on file download
 - [x] API keys with scopes and bucket restrictions for service-to-service use
 - [x] v2 object API addressed by bucket name + object key (PUT/GET/HEAD/DELETE, list by prefix)
-- [ ] Pre-signed URLs
+- [x] Pre-signed URLs (GET/PUT, revocable through the issuing API key)
 - [ ] `minis3-client` Java SDK + Spring Boot starter
 - [x] Handle `FileSizeLimitExceededException`, `StorageException` and `MaxUploadSizeExceededException` with proper status codes
 - [x] Tests for the v2 object API

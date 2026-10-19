@@ -32,3 +32,7 @@ minis3:
   app:
     storage:
       location: ./storage
+  presign:
+    # public base URL put in pre-signed links, e.g. https://laptop.tailnet.ts.net/storage/minis3
+    # empty: built from the incoming request
+    base-url: ${MINIS3_PUBLIC_URL:}

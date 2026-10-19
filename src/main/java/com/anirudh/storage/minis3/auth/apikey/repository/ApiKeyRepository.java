@@ -18,6 +18,8 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long> {
 
     Optional<ApiKey> findByPrefix(String prefix);
 
+    Optional<ApiKey> findByKeyPublicId(UUID keyPublicId);
+
     Page<ApiKey> findByOwnerId(UUID ownerId, Pageable pageable);
 
     Optional<ApiKey> findByKeyPublicIdAndOwnerId(UUID keyPublicId, UUID ownerId);

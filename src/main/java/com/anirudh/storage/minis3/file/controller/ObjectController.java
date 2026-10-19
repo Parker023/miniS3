@@ -1,6 +1,5 @@
 package com.anirudh.storage.minis3.file.controller;
 
-import com.anirudh.storage.minis3.exception.InvalidRequestException;
 import com.anirudh.storage.minis3.file.dto.ObjectContent;
 import com.anirudh.storage.minis3.file.dto.ObjectDetails;
 import com.anirudh.storage.minis3.file.dto.ObjectListResponse;
@@ -26,14 +25,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.InputStream;
-import java.time.ZoneId;
+
+import static com.anirudh.storage.minis3.file.controller.ObjectResponses.rejectFormContent;
+import static com.anirudh.storage.minis3.file.controller.ObjectResponses.stripLeadingSlash;
+import static com.anirudh.storage.minis3.file.controller.ObjectResponses.withObjectHeaders;
 
 /**
  * Objects addressed by bucket name and key, e.g. PUT /api/v2/buckets/invoices/objects/2026/42.pdf.
  * Bucket names are resolved within the caller's own buckets.
- * <p>
- * GET responses carry ETag/Last-Modified, so Spring answers If-None-Match / If-Modified-Since with 304
- * and Range requests with 206 on its own.
  *
  * @author Anirudh
  * @since 19/10/26
@@ -55,17 +54,13 @@ public class ObjectController {
         return ResponseEntity.ok(objectService.listObjects(bucketName, prefix, cursor, limit));
     }
 
-    // {*key} captures the rest of the path including slashes, with a leading '/'
     @PutMapping("/{*key}")
     @PreAuthorize("hasAuthority('SCOPE_WRITE')")
     public ResponseEntity<ObjectDetails> putObject(@PathVariable("bucketName") String bucketName,
                                                    @PathVariable("key") String key,
                                                    @RequestHeader(value = HttpHeaders.CONTENT_TYPE, required = false) String contentType,
                                                    InputStream body) {
-        // Spring's FormContentFilter consumes form bodies on PUT, which would silently store an empty object
-        if (contentType != null && contentType.startsWith(MediaType.APPLICATION_FORM_URLENCODED_VALUE)) {
-            throw new InvalidRequestException("Content-Type " + MediaType.APPLICATION_FORM_URLENCODED_VALUE + " is not supported for objects");
-        }
+        rejectFormContent(contentType);
 
         PutObjectResult result = objectService.putObject(bucketName, stripLeadingSlash(key), contentType, body);
         FileMetadata metadata = result.metadata();
@@ -101,22 +96,5 @@ public class ObjectController {
                                              @PathVariable("key") String key) {
         objectService.deleteObject(bucketName, stripLeadingSlash(key));
         return ResponseEntity.noContent().build();
-    }
-
-    private ResponseEntity.BodyBuilder withObjectHeaders(ResponseEntity.BodyBuilder builder, FileMetadata metadata) {
-        builder.contentType(MediaType.parseMediaType(metadata.getContentType() == null
-                        ? MediaType.APPLICATION_OCTET_STREAM_VALUE : metadata.getContentType()))
-                .header(HttpHeaders.ACCEPT_RANGES, "bytes");
-        if (metadata.getEtag() != null) {
-            builder.eTag(metadata.getEtag());
-        }
-        if (metadata.getUpdatedAt() != null) {
-            builder.lastModified(metadata.getUpdatedAt().atZone(ZoneId.systemDefault()));
-        }
-        return builder;
-    }
-
-    private String stripLeadingSlash(String key) {
-        return key.startsWith("/") ? key.substring(1) : key;
     }
 }

@@ -57,6 +57,14 @@ public class ObjectService {
     public PutObjectResult putObject(String bucketName, String key, String contentType, InputStream content) {
         validateKey(key);
         BucketStore bucketStore = bucketAuthService.resolveAccessibleBucket(bucketName);
+        return putObject(bucketStore, key, contentType, content);
+    }
+
+    /**
+     * For callers that already authorized access to the bucket (e.g. a verified pre-signed URL).
+     */
+    public PutObjectResult putObject(BucketStore bucketStore, String key, String contentType, InputStream content) {
+        validateKey(key);
         UUID bucketId = bucketStore.getBucketPublicId();
 
         Optional<FileMetadata> existing = fileMetadataRepository.findByBucketStoreAndFileName(bucketStore, key);
@@ -81,7 +89,7 @@ public class ObjectService {
         try {
             saved = fileMetadataRepository.save(metadata);
         } catch (RuntimeException e) {
-            log.error("Exception occurred while saving object {} in bucket {}", key, bucketName, e);
+            log.error("Exception occurred while saving object {} in bucket {}", key, bucketStore.getBucketName(), e);
             deleteQuietly(bucketId, newFileId);
             throw e;
         }
@@ -89,7 +97,7 @@ public class ObjectService {
         if (previousFileId != null) {
             deleteQuietly(bucketId, previousFileId);
         }
-        log.info("object {} {} in bucket {}", key, previousFileId == null ? "created" : "replaced", bucketName);
+        log.info("object {} {} in bucket {}", key, previousFileId == null ? "created" : "replaced", bucketStore.getBucketName());
         return new PutObjectResult(saved, previousFileId == null);
     }
 
@@ -102,6 +110,14 @@ public class ObjectService {
     public ObjectContent getObject(String bucketName, String key) {
         validateKey(key);
         BucketStore bucketStore = bucketAuthService.resolveAccessibleBucket(bucketName);
+        return getObject(bucketStore, key);
+    }
+
+    /**
+     * For callers that already authorized access to the bucket (e.g. a verified pre-signed URL).
+     */
+    public ObjectContent getObject(BucketStore bucketStore, String key) {
+        validateKey(key);
         FileMetadata metadata = findObject(bucketStore, key);
         Resource resource = storageService.read(bucketStore.getBucketPublicId(), metadata.getFilePublicId());
         return new ObjectContent(metadata, resource);
@@ -142,7 +158,7 @@ public class ObjectService {
                 .orElseThrow(() -> new ResourceNotFoundException("Object not found"));
     }
 
-    private void validateKey(String key) {
+    public static void validateKey(String key) {
         if (key == null || key.isEmpty()) {
             throw new InvalidRequestException("Object key must not be empty");
         }

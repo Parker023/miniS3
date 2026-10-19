@@ -119,6 +119,15 @@ public class GlobalExceptionHandler {
                         .build());
     }
 
+    @ExceptionHandler(PresignedUrlException.class)
+    public ResponseEntity<ErrorResponse> handlePresignedUrlException(PresignedUrlException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .timestamp(LocalDateTime.now())
+                        .build());
+    }
+
     @ExceptionHandler(InvalidRequestException.class)
     public ResponseEntity<ErrorResponse> handleInvalidRequestException(InvalidRequestException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
