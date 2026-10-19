@@ -7,9 +7,9 @@ spring:
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
-    show-sql: true
+#    show-sql: true
     hibernate:
-      .ddl-auto: update
+      ddl-auto: update
     properties:
       hibernate:
         format_sql: true
@@ -28,7 +28,7 @@ jwt:
 
 minis3:
   upload:
-    max-size: 5MB
+    max-size: 20MB
   app:
     storage:
       location: ./storage

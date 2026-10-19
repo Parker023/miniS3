@@ -51,6 +51,7 @@ public class FileMetadataService {
 
         if (fileAlreadyExists) {
             log.error("file {} already exists for bucketId {}", multipartFile.getOriginalFilename(), bucketPublicId);
+            // TODO versioning
             throw new FileAlreadyExistsException("File Already Exists");
         }
 

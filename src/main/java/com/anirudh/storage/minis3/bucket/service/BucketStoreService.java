@@ -29,6 +29,7 @@ public class BucketStoreService {
 
     private final BucketStoreRepository bucketStoreRepository;
 
+    @Transactional
     public BucketStore createBucket(CreateBucketRequest createBucketRequest) {
 
         UUID ownerId = CommonUtils.getUserIdFromSecurityContext();
