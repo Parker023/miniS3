@@ -2,6 +2,8 @@
 
 A small, monolithic object-storage service inspired by Amazon S3. Users register, log in with a JWT, create **buckets**, and upload, list and download **files** inside those buckets. File bytes live on the local filesystem; metadata lives in PostgreSQL.
 
+**New user?** See [docs/ONBOARDING.md](docs/ONBOARDING.md) for getting Tailscale access to the server and creating your account.
+
 ## Tech stack
 
 | Area        | Choice                                                      |
