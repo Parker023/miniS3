@@ -27,6 +27,12 @@ if ! command -v psql >/dev/null; then
     apt-get install -y -qq postgresql
 fi
 systemctl enable --now postgresql
+# a freshly installed cluster takes a few seconds before it accepts connections
+for _ in $(seq 1 30); do
+    pg_isready -q && break
+    sleep 1
+done
+pg_isready -q || { echo "PostgreSQL is not accepting connections, see: pg_lsclusters" >&2; exit 1; }
 
 echo "==> system user and directories"
 id minis3 >/dev/null 2>&1 || useradd --system --home-dir /var/lib/minis3 --shell /usr/sbin/nologin minis3
