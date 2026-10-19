@@ -1,0 +1,28 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+description = 'Java client for the miniS3 storage service'
+
+java {
+    withSourcesJar()
+}
+
+dependencies {
+    // Jackson 3 (tools.jackson), same major version as Spring Boot 4; different package from Jackson 2, so no clash
+    implementation 'tools.jackson.core:jackson-databind:3.0.4'
+
+    testImplementation platform('org.junit:junit-bom:6.0.3')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'minis3-client'
+            from components.java
+        }
+    }
+}

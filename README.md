@@ -29,6 +29,9 @@ A small, monolithic object-storage service inspired by Amazon S3. Users register
 | `DB_PASSWORD`     | yes      | PostgreSQL password                                                 |
 | `JWT_SECRET`      | yes      | **Base64-encoded** HMAC key, at least 256 bits (32 bytes) once decoded |
 | `JWT_EXPIRATION`  | no       | Token lifetime in ms (default `3600000` = 1 hour)                   |
+| `DB_URL`          | no       | JDBC URL (default `jdbc:postgresql://localhost:5433/minis3`) |
+| `MINIS3_STORAGE_LOCATION` | no | Directory for object bytes (default `./storage`; use an absolute path in production, e.g. `/var/lib/minis3/storage`) |
+| `SERVER_ADDRESS`  | no       | Interface to bind, e.g. `127.0.0.1` behind `tailscale serve` |
 | `MINIS3_PUBLIC_URL` | no     | Base URL put into pre-signed links, e.g. `https://laptop.tailnet.ts.net/storage/minis3`. If empty, it's built from the incoming request |
 
 `JWT_SECRET` also signs pre-signed URLs (a separate key is derived from it), so changing it invalidates every outstanding link. The app won't start without it.
@@ -42,8 +45,10 @@ openssl rand -base64 32
 ### Run
 
 ```bash
-./gradlew bootRun
+./gradlew :service:bootRun
 ```
+
+It runs from the repository root, so `./storage` (uploaded bytes) stays at `<repo>/storage`.
 
 The service starts on **port 2399** under the context path **`/storage/minis3`**, so every endpoint below is prefixed with:
 
@@ -57,11 +62,11 @@ http://localhost:2399/storage/minis3
 ./gradlew test
 ```
 
-Tests use H2 and a fixed test secret from [application-test.yaml](src/test/resources/application-test.yaml).
+This runs the tests of all three modules. The service tests use H2 and a fixed test secret from [application-test.yaml](service/src/test/resources/application-test.yaml); the client is also tested end to end against the real service on a random port.
 
 ## Configuration
 
-Key settings from [application.yaml](src/main/resources/application.yaml):
+Key settings from [application.yaml](service/src/main/resources/application.yaml):
 
 | Property                          | Value              | Meaning                                  |
 |-----------------------------------|--------------------|------------------------------------------|
@@ -69,7 +74,7 @@ Key settings from [application.yaml](src/main/resources/application.yaml):
 | `server.servlet.context-path`     | `/storage/minis3`  |                                          |
 | `spring.servlet.multipart.max-file-size` | `20MB`      | Hard limit enforced by Spring            |
 | `minis3.upload.max-size`          | `20MB`             | Application-level per-file upload limit (v1 and v2) |
-| `minis3.app.storage.location`     | `./storage`        | Root directory for stored file bytes     |
+| `minis3.app.storage.location`     | `${MINIS3_STORAGE_LOCATION:./storage}` | Root directory for stored file bytes; created at startup, which fails if it isn't writable |
 | `minis3.presign.base-url`         | `${MINIS3_PUBLIC_URL:}` | Base URL for pre-signed links       |
 
 Files are stored on disk as `<storage-root>/<bucketPublicId>/<filePublicId>`; the original filename and content type are kept in the database.
@@ -227,7 +232,7 @@ curl $BASE/api/v1/file/buckets/$BUCKET/files -H "Authorization: Bearer $API_KEY"
 
 ### Errors
 
-Errors are returned as `{ "message": "...", "timestamp": "..." }` by [GlobalExceptionHandler](src/main/java/com/anirudh/storage/minis3/exception/GlobalExceptionHandler.java):
+Errors are returned as `{ "message": "...", "timestamp": "..." }` by [GlobalExceptionHandler](service/src/main/java/com/anirudh/storage/minis3/exception/GlobalExceptionHandler.java):
 
 | Status | When |
 |--------|------|
@@ -239,10 +244,161 @@ Errors are returned as `{ "message": "...", "timestamp": "..." }` by [GlobalExce
 | 413    | Upload larger than `minis3.upload.max-size` (or the multipart limit for v1) |
 | 500    | Storage (disk) failure |
 
+## Java client (`minis3-client`)
+
+A small SDK other Java services use instead of writing HTTP calls by hand. It covers the v2 object API and pre-signed URLs, and authenticates with an **API key**. It depends only on the JDK `HttpClient` and Jackson 3, and doesn't need Spring.
+
+### Install
+
+Releases are published to **GitHub Packages** by the [Publish client](.github/workflows/publish-client.yml) workflow whenever a `v*` tag is pushed (or when it's run by hand with a version):
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+GitHub Packages needs a token even for public packages. Create a classic personal access token with the `read:packages` scope and put it in `~/.gradle/gradle.properties`:
+
+```properties
+gpr.user=<your GitHub username>
+gpr.key=<token with read:packages>
+```
+
+Then in the consuming project (Gradle):
+
+```groovy
+repositories {
+    mavenCentral()
+    maven {
+        url = uri('https://maven.pkg.github.com/Parker023/miniS3')
+        credentials {
+            username = findProperty('gpr.user')
+            password = findProperty('gpr.key')
+        }
+    }
+}
+
+dependencies {
+    // Spring Boot 4 apps: auto-configured client bean
+    implementation 'com.anirudh.storage:minis3-spring-boot-starter:0.1.0'
+    // or plain Java
+    implementation 'com.anirudh.storage:minis3-client:0.1.0'
+}
+```
+
+For local development without publishing, use `./gradlew publishToMavenLocal`, then `mavenLocal()` and version `0.0.1-SNAPSHOT`.
+
+### Spring Boot
+
+```yaml
+minis3:
+  client:
+    endpoint: https://<laptop>.<tailnet>.ts.net/storage/minis3
+    api-key: ${MINIS3_API_KEY}
+    # connect-timeout: 10s   (default)
+    # request-timeout: 60s   (default: none, so large uploads aren't cut off)
+```
+
+```java
+@Service
+@RequiredArgsConstructor
+class InvoiceStorage {
+    private final MiniS3Client storage;   // auto-configured
+
+    void save(String id, Path pdf) {
+        storage.putObject("invoices", "2026/" + id + ".pdf", pdf, "application/pdf");
+    }
+
+    URI shareLink(String id) {
+        return storage.presignGet("invoices", "2026/" + id + ".pdf", Duration.ofMinutes(10)).url();
+    }
+}
+```
+
+The bean is only created when `minis3.client.endpoint` is set. Startup fails if `api-key` is missing, and the starter backs off if you define your own `MiniS3Client` bean.
+
+### Plain Java
+
+```java
+try (MiniS3Client storage = MiniS3Client.builder()
+        .endpoint("http://localhost:2399/storage/minis3")
+        .apiKey(System.getenv("MINIS3_API_KEY"))
+        .build()) {
+    storage.putObject("photos", "2026/cat.png", Path.of("cat.png"), "image/png");
+}
+```
+
+### API
+
+| Method | Does |
+|--------|------|
+| `putObject(bucket, key, InputStream \| byte[] \| Path, contentType)` | create or replace; streams, never buffers the whole file. Returns `ObjectInfo` |
+| `getObject(bucket, key)` | `MiniS3Object` with `info()` and a streaming `content()`; close it (try-with-resources) |
+| `getObjectBytes(bucket, key)` | whole object as `byte[]` |
+| `headObject(bucket, key)` / `objectExists(...)` | `Optional<ObjectInfo>`, empty if missing |
+| `deleteObject(bucket, key)` | delete; `MiniS3NotFoundException` if missing |
+| `listObjects(bucket, prefix, cursor, limit)` | one `ObjectPage` |
+| `listAllObjects(bucket, prefix)` | `Stream<ObjectInfo>` that fetches pages lazily |
+| `presignGet` / `presignPut(bucket, key, Duration)` | `PresignedUrl` (url, method, expiresAt) |
+
+`ObjectInfo` holds `key`, `size`, `contentType`, `etag` (hex MD5, no quotes) and `lastModified` (an `Instant`).
+
+**Errors** are all `MiniS3Exception` with `statusCode()`:
+- `MiniS3NotFoundException`: 404
+- `MiniS3AccessDeniedException`: 401 (bad, expired or revoked key) or 403 (missing scope or bucket)
+- anything else, e.g. 413 for an upload that's too large
+- `statusCode() == 0` means there was no response (connection refused, timeout or interrupted)
+
+The client is thread-safe; create one and share it. Keys are percent-encoded per segment, so spaces, `+` and non-ASCII characters work. The server's firewall still rejects keys containing `%`, `;`, `//` or `..` segments.
+
+## Deploying to Ubuntu
+
+[deploy/ubuntu](deploy/ubuntu) installs miniS3 as a systemd service on Ubuntu 22.04+:
+- Java 21 and PostgreSQL from apt
+- a `minis3` database and user with a generated password
+- the system user `minis3`
+- `/var/lib/minis3/storage` for objects
+- `/etc/minis3/minis3.env` for secrets, readable only by root and `minis3`
+
+The service listens on `127.0.0.1:2399` only.
+
+**One-time**: SSH key access from your Mac:
+
+```bash
+ssh-keygen -t ed25519
+```
+```bash
+ssh-copy-id anirudh@192.168.0.5
+```
+
+**Deploy or update** (builds the jar, copies it over, runs `setup.sh` with sudo, waits until the service answers):
+
+```bash
+deploy/ubuntu/deploy.sh anirudh@192.168.0.5
+```
+
+The first run generates the DB password and JWT secret and prints the PostgreSQL credentials. Later runs keep them and only replace the jar. To read them again on the server:
+
+```bash
+sudo cat /etc/minis3/minis3.env
+```
+
+**Expose on your tailnet** (HTTPS, nothing opened to the LAN or internet), then set `MINIS3_PUBLIC_URL` in the env file and restart:
+
+```bash
+sudo tailscale serve --bg 2399
+```
+
+Useful commands on the server: `systemctl status minis3`, `journalctl -u minis3 -f`, `sudo systemctl restart minis3`.
+
 ## Project layout
 
 ```
-src/main/java/com/anirudh/storage/minis3/
+service/                       the Spring Boot storage service
+deploy/ubuntu/                 systemd unit + setup/deploy scripts
+minis3-client/                 plain-Java SDK (MiniS3Client)
+minis3-spring-boot-starter/    auto-configuration for minis3.client.*
+
+service/src/main/java/com/anirudh/storage/minis3/
 ├── auth/            login, JWT service + filter, API keys (auth/apikey), security config
 ├── user/            registration
 ├── bucket/          bucket CRUD + ownership check (BucketAuthService)
@@ -264,7 +420,7 @@ Every entity exposes a random **public UUID** (`userPublicId`, `bucketPublicId`,
 - [x] API keys with scopes and bucket restrictions for service-to-service use
 - [x] v2 object API addressed by bucket name + object key (PUT/GET/HEAD/DELETE, list by prefix)
 - [x] Pre-signed URLs (GET/PUT, revocable through the issuing API key)
-- [ ] `minis3-client` Java SDK + Spring Boot starter
+- [x] `minis3-client` Java SDK + Spring Boot starter
 - [x] Handle `FileSizeLimitExceededException`, `StorageException` and `MaxUploadSizeExceededException` with proper status codes
 - [x] Tests for the v2 object API
 - [ ] Tests for the v1 file endpoints
@@ -272,3 +428,5 @@ Every entity exposes a random **public UUID** (`userPublicId`, `bucketPublicId`,
 - [ ] `delimiter` support in listings (folder-style browsing)
 - [ ] Pluggable remote storage backend (e.g. S3/MinIO) behind `StorageService`
 - [ ] Docker Compose for PostgreSQL + app
+- [x] Publish the client to GitHub Packages (workflow on `v*` tags)
+- [ ] Backups: nightly `pg_dump` + rsync of the storage directory

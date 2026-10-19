@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### miniS3 ###
+# uploaded object bytes (minis3.app.storage.location)
+/storage/

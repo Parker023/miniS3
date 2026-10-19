@@ -1,1 +1,8 @@
 rootProject.name = 'minis3-storage-service'
+
+// the storage service itself (Spring Boot app)
+include 'service'
+// plain-Java SDK other services use to talk to miniS3
+include 'minis3-client'
+// auto-configures a MiniS3Client bean from minis3.client.* properties
+include 'minis3-spring-boot-starter'

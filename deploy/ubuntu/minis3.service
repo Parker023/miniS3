@@ -1,0 +1,25 @@
+[Unit]
+Description=miniS3 storage service
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=minis3
+Group=minis3
+EnvironmentFile=/etc/minis3/minis3.env
+ExecStart=/usr/bin/java -Xmx512m -jar /opt/minis3/minis3-storage-service.jar
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+
+# hardening: the service can only write to its storage directory
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/minis3
+
+[Install]
+WantedBy=multi-user.target
