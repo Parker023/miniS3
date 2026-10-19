@@ -11,6 +11,8 @@ import com.anirudh.storage.minis3.file.mapper.FileMapper;
 import com.anirudh.storage.minis3.file.service.ObjectService;
 import com.anirudh.storage.minis3.file.service.PresignService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -39,6 +41,7 @@ import static com.anirudh.storage.minis3.file.controller.ObjectResponses.withObj
  * @since 19/10/26
  */
 @RestController
+@Tag(name = "Pre-signed URLs", description = "Issue and use time-limited links")
 @RequiredArgsConstructor
 public class PresignController {
 
@@ -53,6 +56,7 @@ public class PresignController {
         return ResponseEntity.ok(presignService.presign(bucketName, request.getKey(), request.getMethod(), request.getExpiresInSeconds()));
     }
 
+    @SecurityRequirements
     @GetMapping("/api/v2/presigned/{bucketId}/{*key}")
     public ResponseEntity<Resource> presignedGet(@PathVariable("bucketId") UUID bucketId,
                                                  @PathVariable("key") String key,
@@ -66,6 +70,7 @@ public class PresignController {
                 .body(object.resource());
     }
 
+    @SecurityRequirements
     @PutMapping("/api/v2/presigned/{bucketId}/{*key}")
     public ResponseEntity<ObjectDetails> presignedPut(@PathVariable("bucketId") UUID bucketId,
                                                       @PathVariable("key") String key,

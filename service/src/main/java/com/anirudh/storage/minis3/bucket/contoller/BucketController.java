@@ -9,6 +9,7 @@ import com.anirudh.storage.minis3.bucket.entity.BucketStore;
 import com.anirudh.storage.minis3.bucket.mapper.BucketMapper;
 import com.anirudh.storage.minis3.bucket.service.BucketStoreService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,7 @@ import java.util.UUID;
  */
 @Slf4j
 @RestController
+@Tag(name = "Buckets", description = "Create, list and delete buckets")
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/bucket/")
 public class BucketController {

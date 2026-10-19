@@ -91,6 +91,17 @@ All endpoints except **register** and **login** require an `Authorization: Beare
 Unauthenticated requests (missing, invalid, expired or revoked credential) get `401 {"message":"Unauthorized", ...}`.
 Authenticated requests without the needed scope or bucket access get `403 {"message":"Access Denied", ...}`.
 
+### Interactive docs (Swagger / OpenAPI)
+
+| What | URL |
+|------|-----|
+| Swagger UI | `{base}/swagger-ui.html`, e.g. https://ani-srv.tail1678db.ts.net/storage/minis3/swagger-ui.html |
+| OpenAPI JSON | `{base}/v3/api-docs` (import into Postman, or generate clients) |
+
+Both are public, but the service itself is only reachable on the tailnet. Click **Authorize** and paste a login token (`eyJ...`) or an API key (`ms3_...`); register, login and pre-signed URLs need no credentials. Requests go to `MINIS3_PUBLIC_URL` when it's set, so "Try it out" works behind `tailscale serve`.
+
+Swagger UI encodes `/` inside a path parameter as `%2F`, which the server's firewall rejects. Use keys without slashes there, or curl, Postman or the client for keys like `docs/a.txt`.
+
 ### Users & auth
 
 | Method | Path                        | Body                                   | Success |
@@ -429,6 +440,7 @@ Every entity exposes a random **public UUID** (`userPublicId`, `bucketPublicId`,
 - [ ] Optimistic locking so concurrent writes to one key can't leave orphaned bytes
 - [ ] `delimiter` support in listings (folder-style browsing)
 - [ ] Pluggable remote storage backend (e.g. S3/MinIO) behind `StorageService`
+- [x] OpenAPI spec + Swagger UI (springdoc)
 - [ ] Docker Compose for PostgreSQL + app
 - [x] Publish the client to GitHub Packages (workflow on `v*` tags)
 - [ ] Backups: nightly `pg_dump` + rsync of the storage directory

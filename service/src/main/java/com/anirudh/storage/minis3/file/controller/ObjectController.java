@@ -7,6 +7,7 @@ import com.anirudh.storage.minis3.file.dto.PutObjectResult;
 import com.anirudh.storage.minis3.file.entity.FileMetadata;
 import com.anirudh.storage.minis3.file.mapper.FileMapper;
 import com.anirudh.storage.minis3.file.service.ObjectService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -38,6 +39,7 @@ import static com.anirudh.storage.minis3.file.controller.ObjectResponses.withObj
  * @since 19/10/26
  */
 @RestController
+@Tag(name = "Objects (v2)", description = "Objects addressed by bucket name and key")
 @RequiredArgsConstructor
 @RequestMapping("/api/v2/buckets/{bucketName}/objects")
 public class ObjectController {

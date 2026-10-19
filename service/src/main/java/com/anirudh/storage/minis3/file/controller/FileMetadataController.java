@@ -8,6 +8,7 @@ import com.anirudh.storage.minis3.file.entity.FileMetadata;
 import com.anirudh.storage.minis3.file.mapper.FileMapper;
 import com.anirudh.storage.minis3.file.service.FileMetadataService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
@@ -36,6 +37,7 @@ import java.util.UUID;
  * @since 02/03/26
  */
 @RestController
+@Tag(name = "Files (v1)", description = "Multipart upload and download by file UUID")
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/file")
 public class FileMetadataController {

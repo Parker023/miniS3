@@ -7,6 +7,7 @@ import com.anirudh.storage.minis3.auth.apikey.dto.GeneratedApiKey;
 import com.anirudh.storage.minis3.auth.apikey.mapper.ApiKeyMapper;
 import com.anirudh.storage.minis3.auth.apikey.service.ApiKeyService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +33,7 @@ import java.util.UUID;
  * @since 19/10/26
  */
 @RestController
+@Tag(name = "API keys", description = "Create, list and revoke API keys (login token only)")
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/keys")
 public class ApiKeyController {

@@ -7,6 +7,8 @@ import com.anirudh.storage.minis3.user.entity.User;
 import com.anirudh.storage.minis3.user.mapper.UserMapper;
 import com.anirudh.storage.minis3.user.service.UserService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,7 @@ import java.net.URI;
  * @since 20/02/26
  */
 @RestController
+@Tag(name = "Users", description = "Register and delete accounts")
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
 @Slf4j
@@ -39,6 +42,7 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
+    @SecurityRequirements
     @PostMapping("/register")
     public ResponseEntity<UserRegistrationResponse> registerUser(@RequestBody @Valid UserRegistrationRequest request) {
         log.info("registration request received for {}", request.getEmail());

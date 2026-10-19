@@ -38,6 +38,9 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers("/api/v1/users/register", "/api/v1/auth/login")
                         .permitAll()
+                        // API docs; the service itself is only reachable on the tailnet
+                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+                        .permitAll()
                         // pre-signed URLs carry their own signature instead of an Authorization header
                         .requestMatchers("/api/v2/presigned/**")
                         .permitAll()

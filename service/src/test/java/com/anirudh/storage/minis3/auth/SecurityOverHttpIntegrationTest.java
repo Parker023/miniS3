@@ -11,9 +11,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Status codes as a real client sees them. MockMvc doesn't perform the servlet container's error forward
@@ -59,6 +61,18 @@ class SecurityOverHttpIntegrationTest {
     @Test
     void missingCredentialsIsUnauthorized() throws Exception {
         assertEquals(401, send("GET", "/api/v1/bucket/", null, null).statusCode());
+    }
+
+    @Test
+    void apiDocsAndSwaggerUiArePublic() throws Exception {
+        HttpResponse<String> docs = send("GET", "/v3/api-docs", null, null);
+        assertEquals(200, docs.statusCode());
+        assertEquals("miniS3", JsonPath.read(docs.body(), "$.info.title"));
+        // v2 objects and pre-signed endpoints are documented, and pre-signed GET needs no auth
+        assertTrue(docs.body().contains("/api/v2/buckets/{bucketName}/objects"));
+        assertEquals(List.of(), JsonPath.read(docs.body(), "$.paths['/api/v2/presigned/{bucketId}/{key}'].get.security"));
+
+        assertEquals(200, send("GET", "/swagger-ui/index.html", null, null).statusCode());
     }
 
     private HttpResponse<String> send(String method, String path, String bearer, String json) throws Exception {
