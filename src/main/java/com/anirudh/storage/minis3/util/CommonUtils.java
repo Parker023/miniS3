@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -18,12 +19,20 @@ public class CommonUtils {
         return UUID.randomUUID();
     }
 
-    public static UUID getUserIdFromSecurityContext() {
+    public static AuthenticatedUser getAuthenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (Objects.isNull(authentication) || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
             throw new InvalidCredentialsException();
         }
-        return user.getUserPublicId();
+        return user;
+    }
 
+    public static UUID getUserIdFromSecurityContext() {
+        return getAuthenticatedUser().getUserPublicId();
+    }
+
+    // buckets the caller is restricted to; empty means all of the caller's buckets
+    public static Set<UUID> getAllowedBucketIds() {
+        return getAuthenticatedUser().getAllowedBucketIds();
     }
 }

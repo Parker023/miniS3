@@ -14,7 +14,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -31,7 +30,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         String authorizationHeaderValue = request.getHeader("Authorization");
-        if (Objects.isNull(authorizationHeaderValue) || !authorizationHeaderValue.startsWith(MiniS3Status.BEARER.getValue())) {
+        // API keys (Bearer ms3_...) are handled by ApiKeyAuthenticationFilter
+        if (Objects.isNull(authorizationHeaderValue) || !authorizationHeaderValue.startsWith(MiniS3Status.BEARER.getValue())
+                || authorizationHeaderValue.startsWith(MiniS3Status.BEARER.getValue() + MiniS3Status.API_KEY.getValue())) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -48,7 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         AuthenticatedUser user = new AuthenticatedUser(UUID.fromString(subj));
 
-        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(user, null, List.of());
+        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
 
         if (Objects.isNull(SecurityContextHolder.getContext().getAuthentication()))
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);

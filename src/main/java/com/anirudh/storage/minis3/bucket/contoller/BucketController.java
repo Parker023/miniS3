@@ -44,6 +44,7 @@ public class BucketController {
     private final BucketAuthService bucketAuthService;
 
     @PostMapping
+    @PreAuthorize("hasAuthority('SCOPE_WRITE')")
     public ResponseEntity<CreateBucketResponse> createBucket(@RequestBody @Valid CreateBucketRequest createBucketRequest) {
         BucketStore bucketStore = bucketStoreService.createBucket(createBucketRequest);
 
@@ -62,6 +63,7 @@ public class BucketController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('SCOPE_READ')")
     public ResponseEntity<Page<BucketDetails>> getBucketDetails(@PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<BucketStore> bucketStorePage = bucketStoreService.getBucketStoreDetails(pageable);
         Page<BucketDetails> bucketDetailsPage = bucketStorePage.map(bucketStore -> bucketMapper.toDto(bucketStore, BucketDetails.class));
@@ -70,7 +72,7 @@ public class BucketController {
     }
 
     @DeleteMapping("/{bucketId}")
-    @PreAuthorize("@bucketAuthService.isOwner(#bucketId)")
+    @PreAuthorize("hasAuthority('SCOPE_DELETE') and @bucketAuthService.canAccess(#bucketId)")
     public ResponseEntity<BucketDeletionResponse> deleteBucket(@PathVariable("bucketId") UUID bucketId) {
         BucketStore bucketStore = bucketStoreService.deleteBucket(bucketId);
 

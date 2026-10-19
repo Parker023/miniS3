@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,6 +36,10 @@ public interface BucketStoreRepository extends JpaRepository<BucketStore, Long> 
     boolean existsByBucketPublicIdAndOwnerId(UUID bucketPublicId, UUID ownerId);
 
     boolean existsByBucketPublicId(UUID bucketPublicId);
+
+    Page<BucketStore> findByOwnerIdAndBucketPublicIdIn(UUID ownerId, Collection<UUID> bucketPublicIds, Pageable pageable);
+
+    long countByOwnerIdAndBucketPublicIdIn(UUID ownerId, Collection<UUID> bucketPublicIds);
 }
 
 

@@ -1,5 +1,6 @@
 package com.anirudh.storage.minis3.user.controller;
 
+import com.anirudh.storage.minis3.auth.apikey.filter.ApiKeyAuthenticationFilter;
 import com.anirudh.storage.minis3.auth.jwt.JwtAuthenticationEntryPoint;
 import com.anirudh.storage.minis3.auth.jwt.filters.JwtAuthenticationFilter;
 import com.anirudh.storage.minis3.exception.UserAlreadyExistsException;
@@ -49,6 +50,9 @@ class UserControllerTest {
 
     @MockitoBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockitoBean
+    private ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
 
     @MockitoBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;

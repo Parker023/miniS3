@@ -14,6 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,6 +50,10 @@ public class BucketStoreService {
 
     public Page<BucketStore> getBucketStoreDetails(Pageable pageable) {
         UUID ownerId = CommonUtils.getUserIdFromSecurityContext();
+        Set<UUID> allowedBucketIds = CommonUtils.getAllowedBucketIds();
+        if (!allowedBucketIds.isEmpty()) {
+            return bucketStoreRepository.findByOwnerIdAndBucketPublicIdIn(ownerId, allowedBucketIds, pageable);
+        }
         return bucketStoreRepository.findByOwnerId(ownerId, pageable);
 
 

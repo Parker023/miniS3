@@ -2,6 +2,7 @@ package com.anirudh.storage.minis3.auth.controller;
 
 import com.anirudh.storage.minis3.auth.dto.LoginRequest;
 import com.anirudh.storage.minis3.auth.dto.LoginResponse;
+import com.anirudh.storage.minis3.auth.apikey.filter.ApiKeyAuthenticationFilter;
 import com.anirudh.storage.minis3.auth.jwt.JwtAuthenticationEntryPoint;
 import com.anirudh.storage.minis3.auth.jwt.filters.JwtAuthenticationFilter;
 import com.anirudh.storage.minis3.auth.service.AuthService;
@@ -39,6 +40,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockitoBean
+    private ApiKeyAuthenticationFilter apiKeyAuthenticationFilter;
 
     @MockitoBean
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;

@@ -1,12 +1,10 @@
 package com.anirudh.storage.minis3.auth.jwt.service;
 
 import com.anirudh.storage.minis3.auth.jwt.properties.JwtProperties;
-import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.security.SignatureException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -47,7 +45,7 @@ public class JwtService {
                     .parseSignedClaims(token)
                     .getPayload()
                     .getSubject();
-        } catch (ExpiredJwtException | SignatureException | MalformedJwtException e) {
+        } catch (JwtException | IllegalArgumentException e) {
             log.error("Jwt token validation failed : {}", e.getMessage());
             return null;
         }

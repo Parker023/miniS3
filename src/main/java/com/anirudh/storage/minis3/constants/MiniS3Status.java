@@ -10,7 +10,7 @@ import lombok.Getter;
 public enum MiniS3Status {
 
     SAVED("Saved"), REGISTERED("Registered"), LOGGEDIN("login success"), AUTH_FAILED("Authentication Failed"),
-    FAILED("Failed"),BEARER("Bearer ");
+    FAILED("Failed"),BEARER("Bearer "), API_KEY("ms3_");
 
     private final String value;
 

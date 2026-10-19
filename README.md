@@ -72,8 +72,15 @@ Files are stored on disk as `<storage-root>/<bucketPublicId>/<filePublicId>`; th
 
 ## API
 
-All endpoints except **register** and **login** require `Authorization: Bearer <token>`.
-Unauthenticated requests get `401 {"message":"Unauthorized", ...}`.
+All endpoints except **register** and **login** require an `Authorization: Bearer <credential>` header. Two kinds of credential are accepted:
+
+| Credential | Who uses it | Looks like | Can do |
+|------------|-------------|------------|--------|
+| **JWT** from `/auth/login` | people, the console | `eyJhbGciOi...` | everything on buckets they own, plus manage API keys |
+| **API key** from `/keys` | other services | `ms3_<prefix>_<secret>` | only its granted scopes (`READ`, `WRITE`, `DELETE`), optionally only on chosen buckets |
+
+Unauthenticated requests (missing, invalid, expired or revoked credential) get `401 {"message":"Unauthorized", ...}`.
+Authenticated requests without the needed scope or bucket access get `403 {"message":"Access Denied", ...}`.
 
 ### Users & auth
 
@@ -83,6 +90,29 @@ Unauthenticated requests get `401 {"message":"Unauthorized", ...}`.
 | POST   | `/api/v1/auth/login`        | `{ "email", "password" }`              | `200` + `{ name, message, token }` (token also in `Authorization` header) |
 
 Validation: name 4–50 chars, valid email, password 8–25 chars.
+
+### API keys (JWT only)
+
+| Method | Path                    | Body | Success |
+|--------|-------------------------|------|---------|
+| POST   | `/api/v1/keys`          | `{ "name", "scopes": ["READ","WRITE","DELETE"], "bucketIds"?: [...], "expiresInDays"?: 1-365 }` | `201` + key details **and the raw `apiKey`** (shown only this once) |
+| GET    | `/api/v1/keys`          | — | `200` + page of key details (never the raw key) |
+| DELETE | `/api/v1/keys/{keyId}`  | — | `200` + key details with `active: false` (revoked; takes effect immediately) |
+
+- Omit `bucketIds` to let the key use every bucket you own; you can only list buckets you own.
+- Omit `expiresInDays` for a key that never expires.
+- Only a SHA-256 hash of the secret is stored. A lost key can't be recovered, so revoke it and create a new one.
+- API keys can't call `/api/v1/keys` themselves, so a leaked key can't create more keys.
+
+Scope needed per endpoint:
+
+| Endpoint | Scope |
+|----------|-------|
+| List buckets, list files, download file | `READ` |
+| Create bucket, upload file | `WRITE` |
+| Delete bucket | `DELETE` |
+
+A key restricted with `bucketIds` only sees those buckets when listing, and gets `403` on any other bucket.
 
 ### Buckets
 
@@ -122,6 +152,14 @@ curl -X POST $BASE/api/v1/file/buckets/$BUCKET/files -H "Authorization: Bearer $
   -F multipartFile=@./cat.png
 
 curl $BASE/api/v1/file/buckets/$BUCKET/files -H "Authorization: Bearer $TOKEN"
+
+# issue a read-only key for another service, limited to this bucket
+API_KEY=$(curl -s -X POST $BASE/api/v1/keys -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d "{\"name\":\"gallery-service\",\"scopes\":[\"READ\"],\"bucketIds\":[\"$BUCKET\"]}" | jq -r .apiKey)
+
+# the service then calls the API with the key
+curl $BASE/api/v1/file/buckets/$BUCKET/files -H "Authorization: Bearer $API_KEY"
 ```
 
 ### Errors
@@ -131,8 +169,8 @@ Errors are returned as `{ "message": "...", "timestamp": "..." }` by [GlobalExce
 | Status | When |
 |--------|------|
 | 400    | Malformed JSON, empty file |
-| 401    | Missing/invalid token, wrong credentials |
-| 403    | Accessing a bucket you don't own |
+| 401    | Missing/invalid/expired/revoked token or API key, wrong credentials |
+| 403    | Bucket you don't own, bucket outside a key's restriction, or missing scope |
 | 404    | Bucket or file not found |
 | 409    | Duplicate email, bucket name or file name |
 
@@ -140,7 +178,7 @@ Errors are returned as `{ "message": "...", "timestamp": "..." }` by [GlobalExce
 
 ```
 src/main/java/com/anirudh/storage/minis3/
-├── auth/            login, JWT service, JWT filter, security config
+├── auth/            login, JWT service + filter, API keys (auth/apikey), security config
 ├── user/            registration
 ├── bucket/          bucket CRUD + ownership check (BucketAuthService)
 ├── file/            file metadata, upload/download, StorageService + LocalStorageService
@@ -156,8 +194,12 @@ Every entity exposes a random **public UUID** (`userPublicId`, `bucketPublicId`,
 
 - [ ] Delete a single file
 - [ ] Delete a bucket's files (disk + metadata) when the bucket is deleted
-- [ ] Enable method security so `@PreAuthorize` ownership checks are enforced
-- [ ] Ownership check on file download
+- [x] Enable method security so `@PreAuthorize` ownership checks are enforced
+- [x] Ownership check on file download
+- [x] API keys with scopes and bucket restrictions for service-to-service use
+- [ ] v2 object API addressed by bucket name + object key (PUT/GET/HEAD/DELETE, list by prefix)
+- [ ] Pre-signed URLs
+- [ ] `minis3-client` Java SDK + Spring Boot starter
 - [ ] Handle `FileSizeLimitExceededException`, `StorageException` and `MaxUploadSizeExceededException` with proper status codes
 - [ ] Tests for the file module
 - [ ] Pluggable remote storage backend (e.g. S3/MinIO) behind `StorageService`

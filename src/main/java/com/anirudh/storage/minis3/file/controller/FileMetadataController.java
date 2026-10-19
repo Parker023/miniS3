@@ -44,7 +44,7 @@ public class FileMetadataController {
     private final BucketAuthService bucketAuthService;
 
     @GetMapping("/buckets/{bucketId}/files")
-    @PreAuthorize("@bucketAuthService.isOwner(#bucketId)")
+    @PreAuthorize("hasAuthority('SCOPE_READ') and @bucketAuthService.canAccess(#bucketPublicId)")
     public ResponseEntity<Page<FileDetailsResponse>> getFiles(@PathVariable("bucketId") UUID bucketPublicId,
                                                               @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<FileMetadata> fileMetadataPage = fileMetadataService.getFileDetails(bucketPublicId, pageable);
@@ -54,7 +54,7 @@ public class FileMetadataController {
     }
 
     @PostMapping(value = "/buckets/{bucketId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("@bucketAuthService.isOwner(#bucketId)")
+    @PreAuthorize("hasAuthority('SCOPE_WRITE') and @bucketAuthService.canAccess(#bucketId)")
     public ResponseEntity<FileDetailsResponse> uploadFile(@PathVariable("bucketId") UUID bucketId, @Valid @ModelAttribute UploadFileRequest uploadFileRequest) {
 
 
@@ -70,7 +70,7 @@ public class FileMetadataController {
 
 
     @GetMapping(value = "/buckets/{bucketPublicId}/files/{filePublicId}")
-    @PreAuthorize("@bucketAuthService.isOwner(#bucketId)")
+    @PreAuthorize("hasAuthority('SCOPE_READ') and @bucketAuthService.canAccess(#bucketId)")
     public ResponseEntity<Resource> downloadFile(@PathVariable("bucketPublicId") UUID bucketId, @PathVariable("filePublicId") UUID filePublicId) {
 
         FileDownloadResponse file = fileMetadataService.downloadFile(bucketId, filePublicId);
