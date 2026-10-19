@@ -1,10 +1,12 @@
 package com.anirudh.storage.minis3.file.service;
 
+import com.anirudh.storage.minis3.file.dto.StoredContent;
 import com.anirudh.storage.minis3.file.dto.UploadFileRequest;
 import com.anirudh.storage.minis3.file.entity.FileMetadata;
 import org.springframework.core.io.Resource;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 
 /**
@@ -17,4 +19,10 @@ public interface StorageService {
     Resource read(UUID bucketId, UUID fileId);
 
     void delete(UUID bucketId, UUID fileId) throws IOException;
+
+    /**
+     * Streams content into the bucket under fileId, enforcing the upload size limit.
+     * The file only appears under fileId once it has been fully written.
+     */
+    StoredContent storeStream(UUID bucketId, UUID fileId, InputStream content);
 }

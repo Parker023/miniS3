@@ -6,6 +6,7 @@ import com.anirudh.storage.minis3.exception.FileAlreadyExistsException;
 import com.anirudh.storage.minis3.exception.ResourceNotFoundException;
 import com.anirudh.storage.minis3.exception.StorageException;
 import com.anirudh.storage.minis3.exception.dto.FileSizeLimitExceededException;
+import com.anirudh.storage.minis3.file.dto.StoredContent;
 import com.anirudh.storage.minis3.file.dto.UploadFileRequest;
 import com.anirudh.storage.minis3.file.entity.FileMetadata;
 import lombok.extern.slf4j.Slf4j;
@@ -17,10 +18,17 @@ import org.springframework.util.unit.DataSize;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.UUID;
 
 /**
@@ -109,6 +117,64 @@ public class LocalStorageService implements StorageService {
         Files.delete(filePath);
         log.debug("file deleted {} successfully", filePath);
 
+    }
+
+    @Override
+    public StoredContent storeStream(UUID bucketId, UUID fileId, InputStream content) {
+        long maxBytes = DataSize.parse(uploadMaxSize).toBytes();
+        Path bucketPath = Paths.get(storageRoot, bucketId.toString());
+        Path tempFile = null;
+
+        try {
+            Files.createDirectories(bucketPath);
+            // write next to the final location so the move below is atomic
+            tempFile = Files.createTempFile(bucketPath, ".upload-", ".tmp");
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+
+            long size;
+            try (InputStream in = new DigestInputStream(content, md5);
+                 OutputStream out = Files.newOutputStream(tempFile)) {
+                size = copyWithLimit(in, out, maxBytes);
+            }
+
+            Files.move(tempFile, bucketPath.resolve(fileId.toString()), StandardCopyOption.ATOMIC_MOVE);
+            log.info("stored {} bytes as {} in bucket {}", size, fileId, bucketId);
+            return new StoredContent(size, HexFormat.of().formatHex(md5.digest()));
+
+        } catch (IOException e) {
+            log.error("Error storing file for bucket {}", bucketId, e);
+            throw new StorageException(e.getMessage());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("MD5 not available", e);
+        } finally {
+            deleteTempFile(tempFile);
+        }
+    }
+
+    private long copyWithLimit(InputStream in, OutputStream out, long maxBytes) throws IOException {
+        byte[] buffer = new byte[8192];
+        long total = 0;
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            total += read;
+            if (total > maxBytes) {
+                throw new FileSizeLimitExceededException("File size limit exceeded");
+            }
+            out.write(buffer, 0, read);
+        }
+        return total;
+    }
+
+    private void deleteTempFile(Path tempFile) {
+        if (tempFile == null) {
+            return;
+        }
+        try {
+            // no-op once the temp file has been moved into place
+            Files.deleteIfExists(tempFile);
+        } catch (IOException e) {
+            log.warn("could not delete temp file {}", tempFile, e);
+        }
     }
 
     private void doFilePathExistsChecks(UUID bucketId, UUID fileId) {

@@ -1,5 +1,6 @@
 package com.anirudh.storage.minis3.file.mapper;
 
+import com.anirudh.storage.minis3.file.dto.ObjectDetails;
 import com.anirudh.storage.minis3.file.dto.UploadFileRequest;
 import com.anirudh.storage.minis3.file.entity.FileMetadata;
 import com.anirudh.storage.minis3.util.CommonUtils;
@@ -29,5 +30,15 @@ public class FileMapper {
 
     public <T> T toDto(FileMetadata fileMetadata, Class<T> classType) {
         return modelMapper.map(fileMetadata, classType);
+    }
+
+    public ObjectDetails toObjectDetails(FileMetadata fileMetadata) {
+        ObjectDetails details = new ObjectDetails();
+        details.setKey(fileMetadata.getFileName());
+        details.setSize(fileMetadata.getSize());
+        details.setContentType(fileMetadata.getContentType());
+        details.setEtag(fileMetadata.getEtag());
+        details.setLastModified(fileMetadata.getUpdatedAt());
+        return details;
     }
 }

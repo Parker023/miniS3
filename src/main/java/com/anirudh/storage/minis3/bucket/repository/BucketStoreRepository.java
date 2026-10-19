@@ -30,6 +30,8 @@ public interface BucketStoreRepository extends JpaRepository<BucketStore, Long> 
 
     Optional<BucketStore> findByBucketPublicId(UUID bucketPublicId);
 
+    Optional<BucketStore> findByOwnerIdAndBucketName(UUID ownerId, String bucketName);
+
     @Modifying
     void deleteByBucketPublicId(UUID bucketId);
 

@@ -1,10 +1,13 @@
 package com.anirudh.storage.minis3.file.repository;
 
+import com.anirudh.storage.minis3.bucket.entity.BucketStore;
 import com.anirudh.storage.minis3.file.entity.FileMetadata;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,5 +22,11 @@ public interface FileMetadataRepository extends JpaRepository<FileMetadata, Long
     Optional<FileMetadata> findByBucketStore_BucketPublicIdAndFilePublicId(UUID bucketPublicId, UUID filePublicId);
 
     boolean existsByBucketStore_BucketPublicIdAndFileNameIgnoreCase(UUID bucketPublicId, String fileName);
+
+    Optional<FileMetadata> findByBucketStoreAndFileName(BucketStore bucketStore, String fileName);
+
+    // keyset pagination for the v2 object listing: keys under prefix, after the cursor, in key order
+    List<FileMetadata> findByBucketStoreAndFileNameStartingWithAndFileNameGreaterThanOrderByFileNameAsc(
+            BucketStore bucketStore, String prefix, String after, Limit limit);
 
 }

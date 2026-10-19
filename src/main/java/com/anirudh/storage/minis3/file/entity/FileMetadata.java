@@ -36,6 +36,8 @@ public class FileMetadata extends BaseEntity {
     @Column(nullable = false)
     private Long size;
     private String contentType;
+    // hex MD5 of the content; set by v2 uploads, null for files uploaded through v1
+    private String etag;
     @ManyToOne
     @JoinColumn(name = "bucket_id", nullable = false)
     private BucketStore bucketStore;

@@ -3,6 +3,7 @@ package com.anirudh.storage.minis3.bucket.auth;
 import com.anirudh.storage.minis3.auth.dto.AuthenticatedUser;
 import com.anirudh.storage.minis3.bucket.entity.BucketStore;
 import com.anirudh.storage.minis3.bucket.repository.BucketStoreRepository;
+import com.anirudh.storage.minis3.exception.BucketAccessDeniedException;
 import com.anirudh.storage.minis3.exception.ResourceNotFoundException;
 import com.anirudh.storage.minis3.util.CommonUtils;
 import lombok.RequiredArgsConstructor;
@@ -31,5 +32,21 @@ public class BucketAuthService {
 
         AuthenticatedUser user = CommonUtils.getAuthenticatedUser();
         return bucketStore.getOwnerId().equals(user.getUserPublicId()) && user.canAccessBucket(bucketPublicId);
+    }
+
+    /**
+     * Resolves a bucket by name within the caller's own buckets (names are unique per owner),
+     * rejecting buckets an API key is restricted away from.
+     */
+    public BucketStore resolveAccessibleBucket(String bucketName) {
+        AuthenticatedUser user = CommonUtils.getAuthenticatedUser();
+        BucketStore bucketStore = bucketStoreRepository
+                .findByOwnerIdAndBucketName(user.getUserPublicId(), bucketName)
+                .orElseThrow(() -> new ResourceNotFoundException("Bucket not Found"));
+
+        if (!user.canAccessBucket(bucketStore.getBucketPublicId())) {
+            throw new BucketAccessDeniedException("Bucket Access Denied");
+        }
+        return bucketStore;
     }
 }
