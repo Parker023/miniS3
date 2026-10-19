@@ -41,8 +41,8 @@ public class SecurityConfig {
                         // pre-signed URLs carry their own signature instead of an Authorization header
                         .requestMatchers("/api/v2/presigned/**")
                         .permitAll()
-                        // key management needs a logged-in user, not an API key
-                        .requestMatchers("/api/v1/keys/**")
+                        // key management and account deletion need a logged-in user, not an API key
+                        .requestMatchers("/api/v1/keys/**", "/api/v1/users/me")
                         .hasAuthority(AuthenticatedUser.ROLE_USER)
                         .anyRequest()
                         .authenticated())

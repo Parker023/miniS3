@@ -1,5 +1,6 @@
 package com.anirudh.storage.minis3.user.controller;
 
+import com.anirudh.storage.minis3.user.dto.DeleteAccountRequest;
 import com.anirudh.storage.minis3.user.dto.UserRegistrationRequest;
 import com.anirudh.storage.minis3.user.dto.UserRegistrationResponse;
 import com.anirudh.storage.minis3.user.entity.User;
@@ -9,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,6 +31,13 @@ public class UserController {
 
     private final UserService userService;
     private final UserMapper userMapper;
+
+    // login token only (see SecurityConfig): an API key can't delete its owner's account
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteAccount(@RequestBody @Valid DeleteAccountRequest request) {
+        userService.deleteAccount(request.getPassword());
+        return ResponseEntity.noContent().build();
+    }
 
     @PostMapping("/register")
     public ResponseEntity<UserRegistrationResponse> registerUser(@RequestBody @Valid UserRegistrationRequest request) {

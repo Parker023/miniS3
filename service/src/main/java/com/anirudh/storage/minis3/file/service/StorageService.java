@@ -25,4 +25,9 @@ public interface StorageService {
      * The file only appears under fileId once it has been fully written.
      */
     StoredContent storeStream(UUID bucketId, UUID fileId, InputStream content);
+
+    /**
+     * Removes everything stored for the bucket. No-op if nothing was ever stored.
+     */
+    void deleteBucket(UUID bucketId) throws IOException;
 }

@@ -11,6 +11,7 @@ import com.anirudh.storage.minis3.file.dto.UploadFileRequest;
 import com.anirudh.storage.minis3.file.entity.FileMetadata;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -160,6 +161,15 @@ public class LocalStorageService implements StorageService {
             throw new IllegalStateException("MD5 not available", e);
         } finally {
             deleteTempFile(tempFile);
+        }
+    }
+
+    @Override
+    public void deleteBucket(UUID bucketId) throws IOException {
+        Path bucketPath = Paths.get(storageRoot, bucketId.toString());
+        if (Files.exists(bucketPath)) {
+            FileUtils.deleteDirectory(bucketPath.toFile());
+            log.info("deleted storage directory for bucket {}", bucketId);
         }
     }
 

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,6 +32,8 @@ public interface BucketStoreRepository extends JpaRepository<BucketStore, Long> 
     Optional<BucketStore> findByBucketPublicId(UUID bucketPublicId);
 
     Optional<BucketStore> findByOwnerIdAndBucketName(UUID ownerId, String bucketName);
+
+    List<BucketStore> findAllByOwnerId(UUID ownerId);
 
     @Modifying
     void deleteByBucketPublicId(UUID bucketId);

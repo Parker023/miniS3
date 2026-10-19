@@ -23,4 +23,6 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long> {
     Page<ApiKey> findByOwnerId(UUID ownerId, Pageable pageable);
 
     Optional<ApiKey> findByKeyPublicIdAndOwnerId(UUID keyPublicId, UUID ownerId);
+
+    long deleteByOwnerId(UUID ownerId);
 }

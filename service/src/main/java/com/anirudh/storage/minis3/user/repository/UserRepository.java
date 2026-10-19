@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * @author Anirudh
@@ -15,4 +16,6 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Integer> {
     @Query(value = "select * from users where email=:email", nativeQuery = true)
     Optional<User> findUserByEmail(String email);
+
+    Optional<User> findByUserPublicId(UUID userPublicId);
 }

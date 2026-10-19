@@ -97,8 +97,9 @@ Authenticated requests without the needed scope or bucket access get `403 {"mess
 |--------|-----------------------------|----------------------------------------|---------|
 | POST   | `/api/v1/users/register`    | `{ "name", "email", "password" }`      | `201` + `{ name, email, userId }` |
 | POST   | `/api/v1/auth/login`        | `{ "email", "password" }`              | `200` + `{ name, message, token }` (token also in `Authorization` header) |
+| DELETE | `/api/v1/users/me`          | `{ "password" }`                       | `204`; deletes the account with all its buckets, files and API keys (login token only, not an API key) |
 
-Validation: name 4–50 chars, valid email, password 8–25 chars.
+Validation: name 4–50 chars, valid email, password 8–25 chars. Deleting the account needs the password again (`401` if wrong). Login tokens already issued keep working until they expire, but they no longer own anything.
 
 ### API keys (JWT only)
 
@@ -129,7 +130,7 @@ A key restricted with `bucketIds` only sees those buckets when listing, and gets
 |--------|------------------------------|-------------------------|---------|
 | POST   | `/api/v1/bucket/`            | `{ "bucketName" }` (3–20 chars) | `201` + `{ message, bucketName, bucketPublicId }` |
 | GET    | `/api/v1/bucket/`            | —                       | `200` + page of `{ bucketName, bucketId, createdAt }` (your buckets only) |
-| DELETE | `/api/v1/bucket/{bucketId}`  | —                       | `200` + `{ bucketName }` |
+| DELETE | `/api/v1/bucket/{bucketId}`  | —                       | `200` + `{ bucketName }`; also deletes every file in it (metadata at once, bytes on disk after the transaction commits) |
 
 Bucket names are unique per owner and may contain only letters, digits, `.`, `_` and `-`, because they appear in v2 URLs. Listing supports `?page=&size=&sort=` (default 20 per page, newest first).
 
@@ -376,7 +377,7 @@ ssh-copy-id anirudh@192.168.0.5
 deploy/ubuntu/deploy.sh anirudh@192.168.0.5
 ```
 
-The first run generates the DB password and JWT secret and prints the PostgreSQL credentials. Later runs keep them and only replace the jar. To read them again on the server:
+The first run generates the DB password and JWT secret and prints the PostgreSQL credentials; later runs keep them, replace the jar, and don't print the password again. Setup also tells systemd-logind to ignore the laptop lid (`/etc/systemd/logind.conf.d/minis3-lid.conf`), so closing it doesn't suspend the server. To read them again on the server:
 
 ```bash
 sudo cat /etc/minis3/minis3.env
@@ -414,7 +415,8 @@ Every entity exposes a random **public UUID** (`userPublicId`, `bucketPublicId`,
 ## Roadmap
 
 - [x] Delete a single file (v2 `DELETE`)
-- [ ] Delete a bucket's files (disk + metadata) when the bucket is deleted
+- [x] Delete a bucket's files (disk + metadata) when the bucket is deleted
+- [x] Delete-account endpoint
 - [x] Enable method security so `@PreAuthorize` ownership checks are enforced
 - [x] Ownership check on file download
 - [x] API keys with scopes and bucket restrictions for service-to-service use

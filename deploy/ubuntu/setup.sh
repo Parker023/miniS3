@@ -41,6 +41,7 @@ install -d -o root -g root -m 755 /opt/minis3
 install -d -o root -g minis3 -m 750 /etc/minis3
 
 echo "==> secrets"
+GENERATED=false
 if [[ -f "$ENV_FILE" ]]; then
     echo "    keeping existing $ENV_FILE"
     # read only what's needed; sourcing would break on hand-edited lines that aren't valid shell
@@ -66,6 +67,7 @@ SERVER_ADDRESS=127.0.0.1
 ENV
     chown root:minis3 "$ENV_FILE"
     chmod 640 "$ENV_FILE"
+    GENERATED=true
     echo "    generated new DB password and JWT secret in $ENV_FILE"
 fi
 
@@ -83,6 +85,20 @@ END
 SQL
 if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'" | grep -q 1; then
     sudo -u postgres createdb -O "$DB_USER" "$DB_NAME"
+fi
+
+echo "==> keep running with the lid closed"
+LID_CONF=/etc/systemd/logind.conf.d/minis3-lid.conf
+if [[ ! -f "$LID_CONF" ]]; then
+    install -d -m 755 /etc/systemd/logind.conf.d
+    cat > "$LID_CONF" <<LID
+# installed by miniS3 setup.sh: this laptop is a server, closing the lid must not suspend it
+[Login]
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+LID
+    systemctl reload systemd-logind 2>/dev/null || echo "    takes effect after a reboot"
 fi
 
 echo "==> application"
@@ -104,13 +120,20 @@ for _ in $(seq 1 60); do
 done
 [[ "${code:-}" == "401" ]] || { echo "service did not come up, see: journalctl -u minis3 -n 100" >&2; exit 1; }
 
+# the password is shown once, when it's generated; later runs point at the env file instead
+if [[ "$GENERATED" == true ]]; then
+    PASSWORD_LINE="password: ${DB_PASSWORD}"
+else
+    PASSWORD_LINE="password: (unchanged, see: sudo grep DB_PASSWORD $ENV_FILE)"
+fi
+
 cat <<SUMMARY
 
 PostgreSQL credentials (also in $ENV_FILE):
   host:     localhost:5432
   database: ${DB_NAME}
   user:     ${DB_USER}
-  password: ${DB_PASSWORD}
+  ${PASSWORD_LINE}
   connect:  psql "postgresql://${DB_USER}:<password>@localhost:5432/${DB_NAME}"
 
 Objects are stored in ${STORAGE_DIR}

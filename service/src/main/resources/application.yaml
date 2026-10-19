@@ -1,12 +1,17 @@
 spring:
   application:
     name: minis3-storage-service
+  autoconfigure:
+    # users come from our own table (JWT / API keys); skip Boot's in-memory user and its logged password
+    exclude: org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5433/minis3}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
+    # all database work happens inside services; don't hold a connection open while writing responses
+    open-in-view: false
 #    show-sql: true
     hibernate:
       ddl-auto: update

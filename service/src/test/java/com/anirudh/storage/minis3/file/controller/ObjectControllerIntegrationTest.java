@@ -66,6 +66,7 @@ class ObjectControllerIntegrationTest {
     private MockMvc mockMvc;
 
     private String token;
+    private String email;
     private String bucketName;
     private String bucketId;
 
@@ -300,6 +301,49 @@ class ObjectControllerIntegrationTest {
         return JsonPath.read(response, "$.url");
     }
 
+    @Test
+    void deletingBucketRemovesItsObjects() throws Exception {
+        putText("a.txt", "one");
+        putText("dir/b.txt", "two");
+        assertEquals(2, filesOnDisk().size());
+
+        mockMvc.perform(withAuth(delete("/api/v1/bucket/{id}", bucketId), token))
+                .andExpect(status().isOk());
+
+        assertEquals(0, filesOnDisk().size());
+        mockMvc.perform(withAuth(get(listUrl()), token))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deletingAccountRemovesEverything() throws Exception {
+        putText("mine.txt", "data");
+        String apiKey = createKey("{\"name\":\"owner-key\",\"scopes\":[\"READ\",\"WRITE\",\"DELETE\"]}");
+
+        mockMvc.perform(withAuth(delete("/api/v1/users/me"), token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"wrong-password\"}"))
+                .andExpect(status().isUnauthorized());
+        // an API key can't delete its owner's account
+        mockMvc.perform(withAuth(delete("/api/v1/users/me"), apiKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"password123\"}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(withAuth(delete("/api/v1/users/me"), token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"password123\"}"))
+                .andExpect(status().isNoContent());
+
+        assertEquals(0, filesOnDisk().size());
+        mockMvc.perform(withAuth(get(listUrl()), apiKey))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + email + "\",\"password\":\"password123\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
     private String objectUrl(String key) {
         return "/api/v2/buckets/" + bucketName + "/objects/" + key;
     }
@@ -326,7 +370,7 @@ class ObjectControllerIntegrationTest {
     }
 
     private String registerAndLogin() throws Exception {
-        String email = "user-" + UUID.randomUUID() + "@example.com";
+        email = "user-" + UUID.randomUUID() + "@example.com";
         mockMvc.perform(post("/api/v1/users/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"tester\",\"email\":\"" + email + "\",\"password\":\"password123\"}"))

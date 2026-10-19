@@ -6,6 +6,8 @@ import com.anirudh.storage.minis3.bucket.mapper.BucketMapper;
 import com.anirudh.storage.minis3.bucket.repository.BucketStoreRepository;
 import com.anirudh.storage.minis3.exception.BucketAlreadyExistsException;
 import com.anirudh.storage.minis3.exception.ResourceNotFoundException;
+import com.anirudh.storage.minis3.file.repository.FileMetadataRepository;
+import com.anirudh.storage.minis3.file.service.StorageService;
 import com.anirudh.storage.minis3.util.CommonUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,6 +45,12 @@ class BucketStoreServiceTest {
 
     @Mock
     private BucketStoreRepository bucketStoreRepository;
+
+    @Mock
+    private FileMetadataRepository fileMetadataRepository;
+
+    @Mock
+    private StorageService storageService;
 
     @InjectMocks
     private BucketStoreService bucketStoreService;
@@ -126,12 +135,16 @@ class BucketStoreServiceTest {
     }
 
     @Test
-    void deleteBucket() {
+    void deleteBucket() throws IOException {
         when(bucketStoreRepository.findByBucketPublicId(bucketId)).thenReturn(Optional.ofNullable(bucketStore));
 
         BucketStore deletedBucket = bucketStoreService.deleteBucket(bucketId);
         verify(bucketStoreRepository).findByBucketPublicId(bucketId);
         assertEquals(bucketId, deletedBucket.getBucketPublicId());
+        // file rows go before the bucket row, and (outside a transaction) the bytes right away
+        verify(fileMetadataRepository).deleteAllInBucket(bucketStore);
+        verify(bucketStoreRepository).delete(bucketStore);
+        verify(storageService).deleteBucket(bucketId);
     }
 
     @Test
