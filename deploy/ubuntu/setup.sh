@@ -43,8 +43,11 @@ install -d -o root -g minis3 -m 750 /etc/minis3
 echo "==> secrets"
 if [[ -f "$ENV_FILE" ]]; then
     echo "    keeping existing $ENV_FILE"
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
+    # read only what's needed; sourcing would break on hand-edited lines that aren't valid shell
+    DB_PASSWORD="$(grep -E '^DB_PASSWORD=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+    [[ -n "$DB_PASSWORD" ]] || { echo "DB_PASSWORD missing from $ENV_FILE" >&2; exit 1; }
+    STORAGE_DIR="$(grep -E '^MINIS3_STORAGE_LOCATION=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+    [[ "$STORAGE_DIR" == /* ]] || { echo "MINIS3_STORAGE_LOCATION in $ENV_FILE must be an absolute path, got: '$STORAGE_DIR'" >&2; exit 1; }
 else
     DB_PASSWORD="$(openssl rand -base64 30 | tr -dc 'A-Za-z0-9' | head -c 32)"
     JWT_SECRET="$(openssl rand -base64 32)"

@@ -24,6 +24,8 @@ import org.springframework.web.util.UriUtils;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -74,7 +76,24 @@ public class PresignService {
         this.bucketAuthService = bucketAuthService;
         this.bucketStoreRepository = bucketStoreRepository;
         this.apiKeyRepository = apiKeyRepository;
-        this.baseUrl = baseUrl;
+        this.baseUrl = validateBaseUrl(baseUrl);
+    }
+
+    // a bad MINIS3_PUBLIC_URL should stop startup with a clear message, not fail every presign request with a 500
+    private static String validateBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) {
+            return "";
+        }
+        try {
+            URI uri = new URI(baseUrl.strip());
+            if (!("http".equals(uri.getScheme()) || "https".equals(uri.getScheme())) || uri.getHost() == null) {
+                throw new URISyntaxException(baseUrl, "expected http(s)://host[:port]/path");
+            }
+            return uri.toString();
+        } catch (URISyntaxException e) {
+            throw new IllegalStateException("minis3.presign.base-url (MINIS3_PUBLIC_URL) is not a valid URL: '"
+                    + baseUrl + "', e.g. https://ani-srv.tailnet-name.ts.net/storage/minis3", e);
+        }
     }
 
     public PresignedUrlResponse presign(String bucketName, String key, PresignMethod method, Long expiresInSeconds) {

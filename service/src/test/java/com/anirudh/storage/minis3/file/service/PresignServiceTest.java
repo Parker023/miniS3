@@ -31,6 +31,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -133,6 +134,17 @@ class PresignServiceTest {
         assertThrows(InvalidRequestException.class, () -> service.presign("photos", "a.txt", PresignMethod.GET, 0L));
         assertThrows(InvalidRequestException.class,
                 () -> service.presign("photos", "a.txt", PresignMethod.GET, Duration.ofDays(8).toSeconds()));
+    }
+
+    @Test
+    void invalidBaseUrlFailsAtStartup() {
+        JwtProperties jwtProperties = new JwtProperties();
+        jwtProperties.setSecret(SECRET);
+        for (String bad : List.of("https://ani-srv.<tailnet>.ts.net/storage/minis3", "\"https://host/x\"", "ani-srv/storage", "ftp://host/x")) {
+            IllegalStateException e = assertThrows(IllegalStateException.class, () -> new PresignService(jwtProperties,
+                    Clock.fixed(NOW, ZoneOffset.UTC), bucketAuthService, bucketStoreRepository, apiKeyRepository, bad), bad);
+            assertTrue(e.getMessage().contains("MINIS3_PUBLIC_URL"));
+        }
     }
 
     private PresignService service(Instant now) {
