@@ -55,7 +55,7 @@ public class FileMetadataController {
 
     @PostMapping(value = "/buckets/{bucketId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('SCOPE_WRITE') and @bucketAuthService.canAccess(#bucketId)")
-    public ResponseEntity<FileDetailsResponse> uploadFile(@PathVariable("bucketId") UUID bucketId, @Valid @ModelAttribute UploadFileRequest uploadFileRequest) {
+    public ResponseEntity<FileDetailsResponse> uploadFile(@PathVariable UUID bucketId, @Valid @ModelAttribute UploadFileRequest uploadFileRequest) {
 
 
         FileMetadata fileMetadata = fileMetadataService.uploadFile(uploadFileRequest, bucketId);
