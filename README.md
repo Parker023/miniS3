@@ -454,6 +454,7 @@ service/                       the Spring Boot storage service
 deploy/ubuntu/                 systemd unit + setup/deploy scripts
 minis3-client/                 plain-Java SDK (MiniS3Client)
 minis3-spring-boot-starter/    auto-configuration for minis3.client.*
+minis3-client-python/          Python client: placeholder, API planned (not built by Gradle)
 
 service/src/main/java/com/anirudh/storage/minis3/
 ├── auth/            login, JWT service + filter, API keys (auth/apikey), security config
