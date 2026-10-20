@@ -71,6 +71,15 @@ ENV
     echo "    generated new DB password and JWT secret in $ENV_FILE"
 fi
 
+# public deployments need an invite code to register; add one to older env files that predate it
+INVITE_GENERATED=false
+if ! grep -qE '^MINIS3_INVITE_CODE=' "$ENV_FILE"; then
+    INVITE_CODE="$(openssl rand -hex 8)"
+    printf '\n# required to register (send it to people you invite); remove the line to allow open registration\nMINIS3_INVITE_CODE=%s\n' "$INVITE_CODE" >> "$ENV_FILE"
+    INVITE_GENERATED=true
+    echo "    added an invite code to $ENV_FILE"
+fi
+
 echo "==> PostgreSQL database"
 sudo -u postgres psql -q -v ON_ERROR_STOP=1 <<SQL
 DO \$\$
@@ -136,6 +145,7 @@ PostgreSQL credentials (also in $ENV_FILE):
   ${PASSWORD_LINE}
   connect:  psql "postgresql://${DB_USER}:<password>@localhost:5432/${DB_NAME}"
 
+Invite code: $([[ "$INVITE_GENERATED" == true ]] && echo "${INVITE_CODE}" || echo "(unchanged, see: sudo grep MINIS3_INVITE_CODE $ENV_FILE)")
 Objects are stored in ${STORAGE_DIR}
 Logs:     journalctl -u minis3 -f
 Expose on your tailnet (HTTPS):  sudo tailscale serve --bg 2399

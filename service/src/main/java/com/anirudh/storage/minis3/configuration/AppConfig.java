@@ -1,6 +1,7 @@
 package com.anirudh.storage.minis3.configuration;
 
 import org.modelmapper.ModelMapper;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -14,6 +15,7 @@ import java.time.Clock;
  * @since 20/02/26
  */
 @Configuration
+@EnableConfigurationProperties(MiniS3LimitsProperties.class)
 public class AppConfig {
 
     @Bean

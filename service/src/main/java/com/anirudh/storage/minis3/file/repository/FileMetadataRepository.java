@@ -28,6 +28,9 @@ public interface FileMetadataRepository extends JpaRepository<FileMetadata, Long
 
     Optional<FileMetadata> findByBucketStoreAndFileName(BucketStore bucketStore, String fileName);
 
+    @Query("select coalesce(sum(f.size), 0) from FileMetadata f where f.bucketStore.ownerId = :ownerId")
+    long totalSizeByOwner(@Param("ownerId") UUID ownerId);
+
     @Modifying
     @Query("delete from FileMetadata f where f.bucketStore = :bucketStore")
     int deleteAllInBucket(@Param("bucketStore") BucketStore bucketStore);

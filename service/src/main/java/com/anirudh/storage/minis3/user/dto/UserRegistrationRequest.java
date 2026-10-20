@@ -23,4 +23,7 @@ public class UserRegistrationRequest {
     @Size(min = 8, max = 25)
     private String password;
 
+    // required only when the server sets MINIS3_INVITE_CODE
+    private String inviteCode;
+
 }

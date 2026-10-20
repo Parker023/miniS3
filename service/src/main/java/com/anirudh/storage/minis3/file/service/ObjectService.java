@@ -48,6 +48,7 @@ public class ObjectService {
     private final StorageService storageService;
     private final BucketAuthService bucketAuthService;
     private final FileMapper fileMapper;
+    private final QuotaService quotaService;
 
     /**
      * Creates or replaces the object. A replacement is written under a new filePublicId and the old bytes are
@@ -70,8 +71,17 @@ public class ObjectService {
         Optional<FileMetadata> existing = fileMetadataRepository.findByBucketStoreAndFileName(bucketStore, key);
         UUID previousFileId = existing.map(FileMetadata::getFilePublicId).orElse(null);
         UUID newFileId = CommonUtils.generateRandomUUID();
+        long replacedBytes = existing.map(FileMetadata::getSize).orElse(0L);
 
+        // the size isn't known before streaming: refuse if not even one byte fits, then check the real size
+        quotaService.ensureFits(bucketStore.getOwnerId(), 1 - replacedBytes);
         StoredContent stored = storageService.storeStream(bucketId, newFileId, content);
+        try {
+            quotaService.ensureFits(bucketStore.getOwnerId(), stored.size() - replacedBytes);
+        } catch (RuntimeException e) {
+            deleteQuietly(bucketId, newFileId);
+            throw e;
+        }
 
         FileMetadata metadata = existing.orElseGet(() -> {
             FileMetadata created = new FileMetadata();

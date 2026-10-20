@@ -38,6 +38,14 @@ minis3:
     storage:
       # absolute path in production, e.g. /var/lib/minis3/storage
       location: ${MINIS3_STORAGE_LOCATION:./storage}
+  limits:
+    # required to register when set; empty = anyone who can reach the server can register
+    invite-code: ${MINIS3_INVITE_CODE:}
+    # failed logins per email within the lockout window before it gets HTTP 429
+    login-max-failures: ${MINIS3_LOGIN_MAX_FAILURES:5}
+    login-lockout: ${MINIS3_LOGIN_LOCKOUT:15m}
+    # total bytes per user across all buckets; 0 = unlimited
+    user-quota: ${MINIS3_USER_QUOTA:5GB}
   presign:
     # public base URL put in pre-signed links, e.g. https://laptop.tailnet.ts.net/storage/minis3
     # empty: built from the incoming request

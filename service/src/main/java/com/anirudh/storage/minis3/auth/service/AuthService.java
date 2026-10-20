@@ -25,20 +25,26 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordUtil passwordUtil;
     private final JwtService jwtService;
+    private final LoginAttemptService loginAttemptService;
 
 
     public LoginResponse login(LoginRequest loginRequest) {
 
+        loginAttemptService.checkAllowed(loginRequest.getEmail());
+
         Optional<User> userByEmail = userRepository.findUserByEmail(loginRequest.getEmail());
 
         if (userByEmail.isEmpty()) {
+            loginAttemptService.recordFailure(loginRequest.getEmail());
             throw new InvalidCredentialsException();
         }
         User user = userByEmail.get();
 
         if (!passwordUtil.matches(loginRequest.getPassword(), user.getPassword())) {
+            loginAttemptService.recordFailure(loginRequest.getEmail());
             throw new InvalidCredentialsException();
         }
+        loginAttemptService.recordSuccess(loginRequest.getEmail());
         log.info("user {} authenticated", user.getName());
 
         String token = jwtService.generateToken(String.valueOf(user.getUserPublicId()));

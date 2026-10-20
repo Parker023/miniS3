@@ -34,7 +34,10 @@ A small, monolithic object-storage service inspired by Amazon S3. Users register
 | `DB_URL`          | no       | JDBC URL (default `jdbc:postgresql://localhost:5433/minis3`) |
 | `MINIS3_STORAGE_LOCATION` | no | Directory for object bytes (default `./storage`; use an absolute path in production, e.g. `/var/lib/minis3/storage`) |
 | `SERVER_ADDRESS`  | no       | Interface to bind, e.g. `127.0.0.1` behind `tailscale serve` |
-| `MINIS3_PUBLIC_URL` | no     | Base URL put into pre-signed links, e.g. `https://laptop.tailnet.ts.net/storage/minis3`. If empty, it's built from the incoming request |
+| `MINIS3_PUBLIC_URL` | no     | Base URL put into pre-signed links and Swagger, e.g. `https://minis3.nullcanvas.blog/storage/minis3`. If empty, it's built from the incoming request |
+| `MINIS3_INVITE_CODE` | no    | When set, registering requires `"inviteCode"` with this value (`403` otherwise). `setup.sh` generates one |
+| `MINIS3_USER_QUOTA` | no     | Total storage per user across all buckets (default `5GB`, `0` = unlimited); uploads beyond it get `507` |
+| `MINIS3_LOGIN_MAX_FAILURES` / `MINIS3_LOGIN_LOCKOUT` | no | Failed logins per email before a lockout, and its length (defaults `5` and `15m`); locked logins get `429` with `Retry-After` |
 
 `JWT_SECRET` also signs pre-signed URLs (a separate key is derived from it), so changing it invalidates every outstanding link. The app won't start without it.
 
@@ -108,7 +111,7 @@ Swagger UI encodes `/` inside a path parameter as `%2F`, which the server's fire
 
 | Method | Path                        | Body                                   | Success |
 |--------|-----------------------------|----------------------------------------|---------|
-| POST   | `/api/v1/users/register`    | `{ "name", "email", "password" }`      | `201` + `{ name, email, userId }` |
+| POST   | `/api/v1/users/register`    | `{ "name", "email", "password", "inviteCode"? }` | `201` + `{ name, email, userId }` |
 | POST   | `/api/v1/auth/login`        | `{ "email", "password" }`              | `200` + `{ name, message, token }` (token also in `Authorization` header) |
 | DELETE | `/api/v1/users/me`          | `{ "password" }`                       | `204`; deletes the account with all its buckets, files and API keys (login token only, not an API key) |
 
@@ -254,8 +257,11 @@ Errors are returned as `{ "message": "...", "timestamp": "..." }` by [GlobalExce
 | 401    | Missing/invalid/expired/revoked token or API key, wrong credentials |
 | 403    | Bucket you don't own, bucket outside a key's restriction, missing scope, or an invalid/expired/revoked pre-signed URL |
 | 404    | Bucket, file or object not found |
+| 403    | Missing or wrong invite code when registering |
 | 409    | Duplicate email, bucket name or file name |
 | 413    | Upload larger than `minis3.upload.max-size` (or the multipart limit for v1) |
+| 429    | Too many failed logins for that email; wait for `Retry-After` seconds |
+| 507    | Upload would exceed your storage quota |
 | 500    | Storage (disk) failure |
 
 ## Java client (`minis3-client`)
@@ -404,6 +410,43 @@ sudo tailscale serve --bg 2399
 
 Useful commands on the server: `systemctl status minis3`, `journalctl -u minis3 -f`, `sudo systemctl restart minis3`.
 
+## Public access (Cloudflare Tunnel)
+
+To serve miniS3 at **https://minis3.nullcanvas.blog/storage/minis3** without opening router ports, run `cloudflared` on `ani-srv`. It connects out to Cloudflare, and Cloudflare provides HTTPS and creates the DNS record.
+
+A CNAME straight to the `*.ts.net` name doesn't work: that name has no public DNS, and its certificate only covers the `ts.net` name.
+
+**1. Install cloudflared on ani-srv**
+
+```bash
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt-get update && sudo apt-get install -y cloudflared
+```
+
+**2. Create the tunnel** in the Cloudflare dashboard:
+1. Go to **Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared**, and name it `ani-srv-minis3`.
+2. On the install page, copy the `sudo cloudflared service install <token>` command and run it on ani-srv. The token is a secret, so don't paste it anywhere else.
+3. Add a **Public Hostname**: subdomain `minis3`, domain `nullcanvas.blog`, path empty, service **HTTP** `localhost:2399`. Cloudflare creates the proxied `minis3` CNAME to the tunnel itself.
+
+**3. Point links and Swagger at the public address**
+
+```bash
+sudo sed -i 's|^MINIS3_PUBLIC_URL=.*|MINIS3_PUBLIC_URL=https://minis3.nullcanvas.blog/storage/minis3|' /etc/minis3/minis3.env
+sudo systemctl restart minis3
+```
+
+**4. Recommended in Cloudflare:**
+- Add a rate-limiting rule (Security → WAF → Rate limiting) on `/storage/minis3/api/v1/auth/login` and `/register`, for example 10 requests per minute per IP. The app's own lockout is per email, because behind the tunnel every request comes from localhost.
+- Optional: put Cloudflare Access in front of `/storage/minis3/swagger-ui*` and `/v3/api-docs` if you don't want the docs public.
+
+Once the tunnel is up, the `tailscale serve` address keeps working as a private route. To give someone access, send them the [onboarding guide](docs/ONBOARDING.md) and the invite code:
+
+```bash
+sudo grep MINIS3_INVITE_CODE /etc/minis3/minis3.env
+```
+
 ## Project layout
 
 ```
@@ -443,6 +486,7 @@ Every entity exposes a random **public UUID** (`userPublicId`, `bucketPublicId`,
 - [ ] `delimiter` support in listings (folder-style browsing)
 - [ ] Pluggable remote storage backend (e.g. S3/MinIO) behind `StorageService`
 - [x] OpenAPI spec + Swagger UI (springdoc)
+- [x] Public-safety limits: invite code, login lockout, per-user quota
 - [ ] Docker Compose for PostgreSQL + app
 - [x] Publish the client to GitHub Packages (workflow on `v*` tags)
 - [ ] Backups: nightly `pg_dump` + rsync of the storage directory

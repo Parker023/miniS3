@@ -36,6 +36,7 @@ public class FileMetadataService {
     private final BucketStoreRepository bucketStoreRepository;
     private final FileMapper fileMapper;
     private final StorageService storageService;
+    private final QuotaService quotaService;
 
     public Page<FileMetadata> getFileDetails(UUID bucketId, Pageable pageable) {
         validateBucketAccess(bucketId);
@@ -58,6 +59,8 @@ public class FileMetadataService {
         BucketStore bucketStore = bucketStoreRepository
                 .findByBucketPublicId(bucketPublicId)
                 .orElseThrow(() -> new ResourceNotFoundException("Bucket not Found"));
+
+        quotaService.ensureFits(bucketStore.getOwnerId(), multipartFile.getSize());
 
         FileMetadata fileMetadata = fileMapper.toEntity(uploadFileRequest);
         storageService.store(bucketPublicId, uploadFileRequest, fileMetadata);

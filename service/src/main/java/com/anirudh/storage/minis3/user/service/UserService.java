@@ -4,7 +4,9 @@ import com.anirudh.storage.minis3.auth.apikey.repository.ApiKeyRepository;
 import com.anirudh.storage.minis3.bucket.entity.BucketStore;
 import com.anirudh.storage.minis3.bucket.repository.BucketStoreRepository;
 import com.anirudh.storage.minis3.bucket.service.BucketStoreService;
+import com.anirudh.storage.minis3.configuration.MiniS3LimitsProperties;
 import com.anirudh.storage.minis3.exception.InvalidCredentialsException;
+import com.anirudh.storage.minis3.exception.InvalidInviteCodeException;
 import com.anirudh.storage.minis3.exception.UserAlreadyExistsException;
 import com.anirudh.storage.minis3.user.dto.UserRegistrationRequest;
 import com.anirudh.storage.minis3.user.entity.User;
@@ -17,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,9 +40,10 @@ public class UserService {
     private final BucketStoreRepository bucketStoreRepository;
     private final BucketStoreService bucketStoreService;
     private final ApiKeyRepository apiKeyRepository;
+    private final MiniS3LimitsProperties limits;
 
     public User register(final UserRegistrationRequest requestPayload) {
-
+        checkInviteCode(requestPayload.getInviteCode());
 
         Optional<User> userByEmail = userRepository.findUserByEmail(requestPayload.getEmail());
 
@@ -55,6 +60,18 @@ public class UserService {
 
         return savedUser;
 
+    }
+
+    private void checkInviteCode(String provided) {
+        String required = limits.getInviteCode();
+        if (required == null || required.isBlank()) {
+            return;
+        }
+        if (provided == null || !MessageDigest.isEqual(
+                required.getBytes(StandardCharsets.UTF_8), provided.getBytes(StandardCharsets.UTF_8))) {
+            log.warn("registration rejected: missing or wrong invite code");
+            throw new InvalidInviteCodeException();
+        }
     }
 
     /**

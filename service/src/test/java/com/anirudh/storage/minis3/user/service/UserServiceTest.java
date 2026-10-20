@@ -9,7 +9,9 @@ import com.anirudh.storage.minis3.util.PasswordUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import com.anirudh.storage.minis3.configuration.MiniS3LimitsProperties;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -36,6 +38,10 @@ class UserServiceTest {
 
     @Mock
     private PasswordUtil passwordUtil;
+
+    // real defaults: no invite code required
+    @Spy
+    private MiniS3LimitsProperties limits = new MiniS3LimitsProperties();
 
     @InjectMocks
     private UserService userService;
